@@ -6,46 +6,55 @@ import burgerui from '../assets/burgerui.mp4';
 
 const VideoItem = ({ src, className }) => {
   const videoRef = useRef(null);
-  const [isVisible, setIsVisible] = useState(false);
+  const [shouldLoad, setShouldLoad] = useState(false);
 
   useEffect(() => {
+    const videoNode = videoRef.current;
+    if (!videoNode) return undefined;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIsVisible(entry.isIntersecting);
+        if (entry.isIntersecting) {
+          setShouldLoad(true);
+          observer.disconnect();
+        }
       },
-      { threshold: 0.1 }
+      { rootMargin: '200px 0px', threshold: 0.05 }
     );
 
-    if (videoRef.current) {
-      observer.observe(videoRef.current);
-    }
+    observer.observe(videoNode);
 
-    return () => {
-      if (videoRef.current) {
-        observer.unobserve(videoRef.current);
-      }
-    };
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
-    if (videoRef.current) {
-      if (isVisible) {
-        videoRef.current.play().catch(err => console.log("Auto-play blocked:", err));
-      } else {
-        videoRef.current.pause();
-      }
-    }
-  }, [isVisible]);
+    const video = videoRef.current;
+    if (!video || !shouldLoad) return undefined;
+
+    const startPlayback = () => {
+      video.muted = true;
+      video.play().catch(() => {});
+    };
+
+    video.addEventListener('canplay', startPlayback);
+    startPlayback();
+
+    return () => {
+      video.removeEventListener('canplay', startPlayback);
+      video.pause();
+    };
+  }, [shouldLoad]);
 
   return (
     <video
       ref={videoRef}
-      src={src}
+      src={shouldLoad ? src : undefined}
       className={className}
       loop
       muted
       playsInline
-      preload="metadata"
+      preload="none"
+      controls={false}
     />
   );
 };
@@ -115,14 +124,14 @@ const AppShowcase = () => {
           {apps.map((app) => (
             <div
               key={app.id}
-              className="w-full h-[300px] sm:h-[445px] border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 transform-gpu"
+              className="w-full h-[300px] sm:h-[445px] border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-300"
             >
               {/* Upper part - for app preview/image */}
               <div className="w-full h-[220px] sm:h-[345px] bg-white flex items-center justify-center overflow-hidden">
                 {app.video ? (
                   <VideoItem
                     src={app.video}
-                    className="w-full h-full object-cover will-change-transform"
+                    className="w-full h-full object-cover transition-opacity duration-300"
                   />
                 ) : (
                   <div className="text-gray-400 text-sm sm:text-base">App Preview/Image</div>
